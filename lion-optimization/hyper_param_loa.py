@@ -8,40 +8,27 @@ param_grid = {
 }
 
 
-def optimize_loa(ids_function, param_grid):
-    """
-    Optimizes the LOA algorithm for an IDS function by tuning the hyperparameters.
+def generate_param_combinations(param_grid):
+    return list(ParameterGrid(param_grid))
 
-    Parameters:
-    ids_function (function): The IDS function to optimize.
-    param_grid (dict): The grid of hyperparameters to search.
 
-    Returns:
-    tuple: A tuple containing the best hyperparameters found by the optimization and their corresponding score.
-    """
-    # Define the bounds of the search space
-    lb = -10
-    ub = 10
+def run_loa(ids_function, params, lb, ub):
+    return loa(ids_function, params["max_iter"], params["num_agents"], lb, ub, params["dimension"])
 
-    # Generate all possible combinations of hyperparameters
-    param_combinations = list(ParameterGrid(param_grid))
 
-    # Initialize variables
+def find_best_hyperparameters(ids_function, param_grid, lb=-10, ub=10):
+    param_combinations = generate_param_combinations(param_grid)
+
     best_params = None
     best_score = np.inf
 
-    # Loop over all hyperparameter combinations
     for params in param_combinations:
-        # Run the LOA algorithm with the current hyperparameters
-        alpha_pos, alpha_score = loa(ids_function, params["max_iter"], params["num_agents"], lb, ub,
-                                     params["dimension"])
+        alpha_pos, alpha_score = run_loa(ids_function, params, lb, ub)
 
-        # Update the best hyperparameters if a better solution was found
         if alpha_score < best_score:
             best_params = params
             best_score = alpha_score
 
-    # Return the best hyperparameters found
     return best_params, best_score
 
 
