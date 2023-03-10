@@ -7,6 +7,7 @@ param_grid = {
     "dimension": [5, 10, 15]
 }
 
+
 def optimize_loa(ids_function, param_grid):
     """
     Optimizes the LOA algorithm for an IDS function by tuning the hyperparameters.
@@ -44,21 +45,44 @@ def optimize_loa(ids_function, param_grid):
     return best_params, best_score
 
 
+def initialize_positions(lower_bound, upper_bound, num_agents, dimension):
+    return np.random.uniform(lower_bound, upper_bound, size=(num_agents, dimension))
+
+
+def update_alpha_beta_delta_positions(positions, fitness, best_alpha_pos, best_alpha_score, best_beta_pos, best_beta_score, best_delta_pos, best_delta_score):
+    alpha_mask = fitness < best_alpha_score
+    best_alpha_score = np.where(alpha_mask, fitness, best_alpha_score)
+    best_alpha_pos = np.where(alpha_mask.reshape(-1, 1), positions, best_alpha_pos)
+
+    beta_mask = (fitness > best_alpha_score) & (fitness < best_beta_score)
+    best_beta_score = np.where(beta_mask, fitness, best_beta_score)
+    best_beta_pos = np.where(beta_mask.reshape(-1, 1), positions, best_beta_pos)
+
+    delta_mask = (fitness > best_alpha_score) & (fitness > best_beta_score) & (fitness < best_delta_score)
+    best_delta_score = np.where(delta_mask, fitness, best_delta_score)
+    best_delta_pos = np.where(delta_mask.reshape(-1, 1), positions, best_delta_pos)
+
+    return best_alpha_pos, best_alpha_score, best_beta_pos, best_beta_score, best_delta_pos, best_delta_score
+
+
+def update_agent_positions(positions, best_alpha_pos, best_beta_pos, best_delta_pos):
+    random_1 = np.random.rand(len(positions), len(positions[0]))
+    random_2 = np.random.rand(len(positions), len(positions[0]))
+    agent_movement_1 = 2 * random_1 - 1
+    agent_movement_2 = 2 * random_2
+    distance_from_delta = np.abs(agent_movement_2 * best_delta_pos - positions)
+    position_change_1 = best_delta_pos - agent_movement_1 * distance_from_delta
+    position_change_2 = best_alpha_pos - agent_movement_1 * distance_from_delta
+    position_change_3 = (best_alpha_pos + best_beta_pos + best_delta_pos) / 3
+    positions = (position_change_1 + position_change_2 + position_change_3) / 3
+    return positions
+
+
+def apply_position_bounds(positions, lower_bound, upper_bound):
+    return np.clip(positions, lower_bound, upper_bound)
+
+
 def loa(ids_function, max_iterations, num_agents, lower_bound, upper_bound, dimension):
-    """
-    Runs the Lion Optimization Algorithm (LOA) to optimize an Intrusion Detection System (IDS) function.
-
-    Parameters:
-    ids_function (function): The IDS function to optimize.
-    max_iterations (int): The maximum number of iterations to run the LOA algorithm.
-    num_agents (int): The number of agents to use in the LOA algorithm.
-    lower_bound (float): The lower bound for the search space.
-    upper_bound (float): The upper bound for the search space.
-    dimension (int): The dimensionality of the search space.
-
-    Returns:
-    tuple: A tuple containing the best position found by the LOA algorithm and its corresponding score.
-    """
     # Initialize variables
     best_alpha_pos = np.zeros(dimension)
     best_alpha_score = np.inf
@@ -66,7 +90,7 @@ def loa(ids_function, max_iterations, num_agents, lower_bound, upper_bound, dime
     best_beta_score = np.inf
     best_delta_pos = np.zeros(dimension)
     best_delta_score = np.inf
-    positions = np.random.uniform(lower_bound, upper_bound, size=(num_agents, dimension))
+    positions = initialize_positions(lower_bound, upper_bound, num_agents, dimension)
 
     # Main loop
     for iteration in range(max_iterations):
@@ -74,31 +98,14 @@ def loa(ids_function, max_iterations, num_agents, lower_bound, upper_bound, dime
         fitness = np.apply_along_axis(ids_function, 1, positions)
 
         # Update alpha, beta, and delta positions
-        alpha_mask = fitness < best_alpha_score
-        best_alpha_score = np.where(alpha_mask, fitness, best_alpha_score)
-        best_alpha_pos = np.where(alpha_mask.reshape(-1, 1), positions, best_alpha_pos)
-
-        beta_mask = (fitness > best_alpha_score) & (fitness < best_beta_score)
-        best_beta_score = np.where(beta_mask, fitness, best_beta_score)
-        best_beta_pos = np.where(beta_mask.reshape(-1, 1), positions, best_beta_pos)
-
-        delta_mask = (fitness > best_alpha_score) & (fitness > best_beta_score) & (fitness < best_delta_score)
-        best_delta_score = np.where(delta_mask, fitness, best_delta_score)
-        best_delta_pos = np.where(delta_mask.reshape(-1, 1), positions, best_delta_pos)
+        (best_alpha_pos, best_alpha_score, best_beta_pos, best_beta_score, best_delta_pos, best_delta_score) = update_alpha_beta_delta_positions(
+            positions, fitness, best_alpha_pos, best_alpha_score, best_beta_pos, best_beta_score, best_delta_pos, best_delta_score)
 
         # Update the positions of agents
-        random_1 = np.random.rand(num_agents, dimension)
-        random_2 = np.random.rand(num_agents, dimension)
-        agent_movement_1 = 2 * random_1 - 1
-        agent_movement_2 = 2 * random_2
-        distance_from_delta = np.abs(agent_movement_2 * best_delta_pos - positions)
-        position_change_1 = best_delta_pos - agent_movement_1 * distance_from_delta
-        position_change_2 = best_alpha_pos - agent_movement_1 * distance_from_delta
-        position_change_3 = (best_alpha_pos + best_beta_pos + best_delta_pos) / 3
-        positions = (position_change_1 + position_change_2 + position_change_3) / 3
+        positions = update_agent_positions(positions, best_alpha_pos, best_beta_pos, best_delta_pos)
 
         # Apply bounds to the positions
-        positions = np.clip(positions, lower_bound, upper_bound)
+        positions = apply_position_bounds(positions, lower_bound, upper_bound)
 
     # Return the best solution
     return best_alpha_pos, best_alpha_score
