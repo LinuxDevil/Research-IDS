@@ -5,7 +5,7 @@ from tensorflow.keras.layers import Conv2D, Dense, Dropout, Flatten, MaxPooling2
 from tensorflow.keras.models import Sequential
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from loa import loa
+from hyper_param_loa import loa
 
 # traffic analyzer->
 # preprocessing->
